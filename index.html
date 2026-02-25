@@ -1,0 +1,636 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+// --- 元素データ定義 ---
+const ELEMENT_CATEGORIES = {
+  alkali: { color: '#ef4444', bg: 'bg-red-500/30', border: 'border-red-500', name: 'アルカリ金属' },
+  alkaline: { color: '#f97316', bg: 'bg-orange-500/30', border: 'border-orange-500', name: 'アルカリ土類金属' },
+  transition: { color: '#a855f7', bg: 'bg-purple-500/30', border: 'border-purple-500', name: '遷移金属' },
+  postTransition: { color: '#22c55e', bg: 'bg-green-500/30', border: 'border-green-500', name: 'その他の金属' },
+  metalloid: { color: '#eab308', bg: 'bg-yellow-500/30', border: 'border-yellow-500', name: '半金属' },
+  nonmetal: { color: '#3b82f6', bg: 'bg-blue-500/30', border: 'border-blue-500', name: '非金属' },
+  halogen: { color: '#0ea5e9', bg: 'bg-sky-500/30', border: 'border-sky-500', name: 'ハロゲン' },
+  noble: { color: '#ec4899', bg: 'bg-pink-500/30', border: 'border-pink-500', name: '希ガス' },
+  lanthanide: { color: '#06b6d4', bg: 'bg-cyan-500/30', border: 'border-cyan-500', name: 'ランタノイド' },
+  actinide: { color: '#8b5cf6', bg: 'bg-violet-500/30', border: 'border-violet-500', name: 'アクチノイド' },
+  unknown: { color: '#9ca3af', bg: 'bg-gray-500/30', border: 'border-gray-500', name: '不明' },
+};
+
+const rawElements = [
+  "1,H,水素,nonmetal,1,1", "2,He,ヘリウム,noble,1,18",
+  "3,Li,リチウム,alkali,2,1", "4,Be,ベリリウム,alkaline,2,2", "5,B,ホウ素,metalloid,2,13", "6,C,炭素,nonmetal,2,14", "7,N,窒素,nonmetal,2,15", "8,O,酸素,nonmetal,2,16", "9,F,フッ素,halogen,2,17", "10,Ne,ネオン,noble,2,18",
+  "11,Na,ナトリウム,alkali,3,1", "12,Mg,マグネシウム,alkaline,3,2", "13,Al,アルミニウム,postTransition,3,13", "14,Si,ケイ素,metalloid,3,14", "15,P,リン,nonmetal,3,15", "16,S,硫黄,nonmetal,3,16", "17,Cl,塩素,halogen,3,17", "18,Ar,アルゴン,noble,3,18",
+  "19,K,カリウム,alkali,4,1", "20,Ca,カルシウム,alkaline,4,2", "21,Sc,スカンジウム,transition,4,3", "22,Ti,チタン,transition,4,4", "23,V,バナジウム,transition,4,5", "24,Cr,クロム,transition,4,6", "25,Mn,マンガン,transition,4,7", "26,Fe,鉄,transition,4,8", "27,Co,コバルト,transition,4,9", "28,Ni,ニッケル,transition,4,10", "29,Cu,銅,transition,4,11", "30,Zn,亜鉛,transition,4,12", "31,Ga,ガリウム,postTransition,4,13", "32,Ge,ゲルマニウム,metalloid,4,14", "33,As,ヒ素,metalloid,4,15", "34,Se,セレン,nonmetal,4,16", "35,Br,臭素,halogen,4,17", "36,Kr,クリプトン,noble,4,18",
+  "37,Rb,ルビジウム,alkali,5,1", "38,Sr,ストロンチウム,alkaline,5,2", "39,Y,イットリウム,transition,5,3", "40,Zr,ジルコニウム,transition,5,4", "41,Nb,ニオブ,transition,5,5", "42,Mo,モリブデン,transition,5,6", "43,Tc,テクネチウム,transition,5,7", "44,Ru,ルテニウム,transition,5,8", "45,Rh,ロジウム,transition,5,9", "46,Pd,パラジウム,transition,5,10", "47,Ag,銀,transition,5,11", "48,Cd,カドミウム,transition,5,12", "49,In,インジウム,postTransition,5,13", "50,Sn,スズ,postTransition,5,14", "51,Sb,アンチモン,metalloid,5,15", "52,Te,テルル,metalloid,5,16", "53,I,ヨウ素,halogen,5,17", "54,Xe,キセノン,noble,5,18",
+  "55,Cs,セシウム,alkali,6,1", "56,Ba,バリウム,alkaline,6,2", "57,La,ランタン,transition,6,3", "58,Ce,セリウム,lanthanide,9,4", "59,Pr,プラセオジム,lanthanide,9,5", "60,Nd,ネオジム,lanthanide,9,6", "61,Pm,プロメチウム,lanthanide,9,7", "62,Sm,サマリウム,lanthanide,9,8", "63,Eu,ユウロピウム,lanthanide,9,9", "64,Gd,ガドリニウム,lanthanide,9,10", "65,Tb,テルビウム,lanthanide,9,11", "66,Dy,ジスプロシウム,lanthanide,9,12", "67,Ho,ホルミウム,lanthanide,9,13", "68,Er,エルビウム,lanthanide,9,14", "69,Tm,ツリウム,lanthanide,9,15", "70,Yb,イッテルビウム,lanthanide,9,16", "71,Lu,ルテチウム,lanthanide,9,17", "72,Hf,ハフニウム,transition,6,4", "73,Ta,タンタル,transition,6,5", "74,W,タングステン,transition,6,6", "75,Re,レニウム,transition,6,7", "76,Os,オスミウム,transition,6,8", "77,Ir,イリジウム,transition,6,9", "78,Pt,白金,transition,6,10", "79,Au,金,transition,6,11", "80,Hg,水銀,transition,6,12", "81,Tl,タリウム,postTransition,6,13", "82,Pb,鉛,postTransition,6,14", "83,Bi,ビスマス,postTransition,6,15", "84,Po,ポロニウム,postTransition,6,16", "85,At,アスタチン,halogen,6,17", "86,Rn,ラドン,noble,6,18",
+  "87,Fr,フランシウム,alkali,7,1", "88,Ra,ラジウム,alkaline,7,2", "89,Ac,アクチニウム,transition,7,3", "90,Th,トリウム,actinide,10,4", "91,Pa,プロトアクチニウム,actinide,10,5", "92,U,ウラン,actinide,10,6", "93,Np,ネプツニウム,actinide,10,7", "94,Pu,プルトニウム,actinide,10,8", "95,Am,アメリシウム,actinide,10,9", "96,Cm,キュリウム,actinide,10,10", "97,Bk,バークリウム,actinide,10,11", "98,Cf,カリホルニウム,actinide,10,12", "99,Es,アインスタイニウム,actinide,10,13", "100,Fm,フェルミウム,actinide,10,14", "101,Md,メンデレビウム,actinide,10,15", "102,No,ノーベリウム,actinide,10,16", "103,Lr,ローレンシウム,actinide,10,17", "104,Rf,ラザホージウム,transition,7,4", "105,Db,ドブニウム,transition,7,5", "106,Sg,シーボーギウム,transition,7,6", "107,Bh,ボーリウム,transition,7,7", "108,Hs,ハッシウム,transition,7,8", "109,Mt,マイトネリウム,unknown,7,9", "110,Ds,ダームスタチウム,unknown,7,10", "111,Rg,レントゲニウム,unknown,7,11", "112,Cn,コペルニシウム,postTransition,7,12", "113,Nh,ニホニウム,unknown,7,13", "114,Fl,フレロビウム,postTransition,7,14", "115,Mc,モスコビウム,unknown,7,15", "116,Lv,リバモリウム,postTransition,7,16", "117,Ts,テネシン,unknown,7,17", "118,Og,オガネソン,unknown,7,18"
+];
+
+const elementsData = rawElements.map(row => {
+  const [num, symbol, name, cat, r, c] = row.split(',');
+  return { num: parseInt(num), symbol, name, category: cat, row: parseInt(r), col: parseInt(c) };
+});
+
+
+export default function App() {
+  const [screen, setScreen] = useState('title'); // 'title', 'settings', 'game', 'result', 'ranking'
+  // デフォルトで1番から20番までの元素をアクティブにする
+  const [activeElements, setActiveElements] = useState(Array.from({ length: 20 }, (_, i) => i + 1));
+  const [timeLimit, setTimeLimit] = useState(60); // 30, 60, 180, 0(無制限)
+  const [scores, setScores] = useState([]); // インメモリランキング
+  const [lastResult, setLastResult] = useState(null);
+
+  const handleGameOver = (result) => {
+    setLastResult(result);
+    if (result.score > 0) {
+      setScores(prev => {
+        const newScores = [...prev, {
+          score: result.score,
+          elementsCount: activeElements.length,
+          date: new Date().toLocaleString(),
+          id: Date.now()
+        }];
+        return newScores.sort((a, b) => b.score - a.score).slice(0, 10);
+      });
+    }
+    setScreen('result');
+  };
+
+  // 画面遷移時のエフェクト用ラッパー
+  const navigateTo = (targetScreen) => {
+    setScreen(targetScreen);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0f1d] text-slate-100 font-sans overflow-hidden relative select-none">
+      <style>{`
+        @keyframes pop-out {
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; border-width: 6px; }
+          100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; border-width: 0px; }
+        }
+      `}</style>
+      {/* 共通の背景エフェクト */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-600/10 rounded-full blur-[120px]"></div>
+      </div>
+
+      {screen === 'title' && (
+        <TitleScreen onNavigate={navigateTo} />
+      )}
+      {screen === 'settings' && (
+        <SettingsScreen 
+          activeElements={activeElements} 
+          setActiveElements={setActiveElements}
+          timeLimit={timeLimit}
+          setTimeLimit={setTimeLimit}
+          onNavigate={navigateTo} 
+        />
+      )}
+      {screen === 'game' && (
+        <GameScreen 
+          activeElements={activeElements}
+          timeLimit={timeLimit}
+          onGameOver={handleGameOver}
+        />
+      )}
+      {screen === 'result' && (
+        <ResultScreen 
+          result={lastResult}
+          onNavigate={navigateTo}
+        />
+      )}
+      {screen === 'ranking' && (
+        <RankingScreen 
+          scores={scores}
+          onNavigate={navigateTo}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- タイトル画面 ---
+function TitleScreen({ onNavigate }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen relative z-10">
+      <div className="text-center mb-16 relative">
+        <h1 className="text-6xl md:text-8xl font-serif font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 drop-shadow-[0_0_15px_rgba(56,189,248,0.5)]">
+          ELEMENTAL
+        </h1>
+        <h2 className="text-2xl md:text-4xl font-light tracking-[0.3em] text-slate-300 mt-4">
+          元素記号タイピング
+        </h2>
+      </div>
+
+      <div className="flex flex-col gap-6 w-full max-w-xs">
+        <MenuButton onClick={() => onNavigate('game')} primary>スタート</MenuButton>
+        <MenuButton onClick={() => onNavigate('settings')}>元素設定</MenuButton>
+        <MenuButton onClick={() => onNavigate('ranking')}>ハイスコア</MenuButton>
+      </div>
+    </div>
+  );
+}
+
+function MenuButton({ children, onClick, primary }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative px-8 py-4 rounded-xl text-xl tracking-wider font-semibold transition-all duration-300 overflow-hidden group
+        ${primary 
+          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(147,51,234,0.6)]' 
+          : 'bg-white/5 border border-white/10 backdrop-blur-md text-slate-200 hover:bg-white/10 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+        }`}
+    >
+      <div className="absolute inset-0 bg-white/20 translate-y-[-100%] group-hover:translate-y-[100%] transition-transform duration-500 ease-in-out pointer-events-none"></div>
+      {children}
+    </button>
+  );
+}
+
+// --- 設定（周期表）画面 ---
+function SettingsScreen({ activeElements, setActiveElements, timeLimit, setTimeLimit, onNavigate }) {
+  const toggleElement = (num) => {
+    setActiveElements(prev => {
+      if (prev.includes(num)) {
+        if (prev.length <= 1) return prev; // 最低1つは残す
+        return prev.filter(n => n !== num);
+      } else {
+        return [...prev, num];
+      }
+    });
+  };
+
+  const selectGroup = (type) => {
+    if (type === 'all') setActiveElements(elementsData.map(e => e.num));
+    if (type === 'clear') setActiveElements([1]); // 最低1つ残す
+    if (type === 'basic') setActiveElements(Array.from({length: 20}, (_, i) => i + 1));
+  };
+
+  return (
+    <div className="flex flex-col h-screen p-6 relative z-10 max-w-[1400px] mx-auto">
+      <div className="flex justify-between items-center mb-6 shrink-0">
+        <h2 className="text-3xl font-serif text-blue-300 drop-shadow-[0_0_10px_rgba(147,197,253,0.5)]">元素設定</h2>
+        <button onClick={() => onNavigate('title')} className="px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-md transition-all">
+          戻る
+        </button>
+      </div>
+
+      <div className="flex gap-4 mb-6 shrink-0 flex-wrap">
+        <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/10 backdrop-blur-sm">
+          <span className="text-slate-400 pl-2">制限時間:</span>
+          {[
+            { label: '30秒', value: 30 },
+            { label: '1分', value: 60 },
+            { label: '3分', value: 180 },
+            { label: '無制限', value: 0 },
+          ].map(t => (
+            <button
+              key={t.value}
+              onClick={() => setTimeLimit(t.value)}
+              className={`px-4 py-1.5 rounded-lg transition-all text-sm font-bold ${
+                timeLimit === t.value 
+                  ? 'bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]' 
+                  : 'bg-transparent text-slate-400 hover:bg-white/10'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 bg-white/5 p-2 rounded-xl border border-white/10 backdrop-blur-sm">
+          <button onClick={() => selectGroup('basic')} className="px-4 py-1.5 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all">1〜20番</button>
+          <button onClick={() => selectGroup('all')} className="px-4 py-1.5 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all">すべて</button>
+          <button onClick={() => selectGroup('clear')} className="px-4 py-1.5 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all text-red-300">リセット</button>
+        </div>
+        
+        <div className="ml-auto flex items-center bg-blue-900/30 px-4 py-2 rounded-xl border border-blue-500/30">
+          <span className="text-blue-200 font-bold">選択中: {activeElements.length} 種類</span>
+        </div>
+      </div>
+
+      {/* 周期表グリッド */}
+      <div className="flex-1 overflow-auto bg-black/20 rounded-2xl border border-white/10 backdrop-blur-md p-4 min-w-[800px]">
+        <div className="grid grid-cols-[repeat(18,minmax(0,1fr))] gap-1 md:gap-1.5 h-full min-h-[500px]">
+          {elementsData.map(elem => {
+            const isActive = activeElements.includes(elem.num);
+            const cat = ELEMENT_CATEGORIES[elem.category];
+            
+            return (
+              <div
+                key={elem.num}
+                onClick={() => toggleElement(elem.num)}
+                style={{ gridColumn: elem.col, gridRow: elem.row }}
+                className={`relative flex flex-col items-center justify-center p-0.5 md:p-1 rounded cursor-pointer transition-all duration-200 border
+                  ${isActive 
+                    ? `${cat.bg} ${cat.border} text-white shadow-[0_0_12px_${cat.color}60] scale-100 z-10` 
+                    : 'bg-slate-800/40 border-slate-700/50 text-slate-500 scale-95 hover:bg-slate-700/60'
+                  }`}
+              >
+                <span className="absolute top-0.5 left-1 text-[8px] md:text-[10px] font-mono opacity-80">{elem.num}</span>
+                <span className={`text-sm md:text-xl font-bold font-serif ${isActive ? 'drop-shadow-md' : ''}`}>{elem.symbol}</span>
+                <span className="text-[8px] md:text-[10px] mt-auto truncate w-full text-center opacity-90">{elem.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- ゲーム画面 ---
+function GameScreen({ activeElements, timeLimit, onGameOver }) {
+  const [circles, setCircles] = useState([]);
+  const [particles, setParticles] = useState([]);
+  const [inputStr, setInputStr] = useState('');
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(timeLimit);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [message, setMessage] = useState('');
+
+  const inputRef = useRef(null);
+  const requestRef = useRef();
+  const lastTimeRef = useRef(performance.now());
+  const lastSpawnTimeRef = useRef(performance.now());
+  const currentSpawnInterval = useRef(1500); // 初期スポーン間隔(ms)
+  const growthRateRef = useRef(15); // 1秒あたりの拡大サイズ(px)
+  const scoreRef = useRef(0); // アニメーションループ内参照用
+  const isPlayingRef = useRef(true); // アニメーションループ内参照用
+
+  const activeElementObjs = useRef(elementsData.filter(e => activeElements.includes(e.num)));
+
+  // 新しい円を生成
+  const spawnCircle = useCallback((currentTime = performance.now()) => {
+    const list = activeElementObjs.current;
+    if (list.length === 0) return;
+    const elem = list[Math.floor(Math.random() * list.length)];
+    const size = window.innerWidth > 768 ? 60 : 40; // PCとスマホで初期サイズ変更
+    
+    const newCircle = {
+      id: Math.random().toString(36).substring(2, 9) + Date.now(),
+      element: elem,
+      x: 15 + Math.random() * 70, // 15% ~ 85% の範囲
+      y: 15 + Math.random() * 70,
+      size: size,
+      opacity: 0, // フェードイン用
+    };
+    
+    setCircles(prev => [...prev, newCircle]);
+    lastSpawnTimeRef.current = currentTime;
+  }, []);
+
+  // ゲームループ
+  const animate = useCallback((time) => {
+    if (!isPlayingRef.current) return;
+    
+    const deltaTime = time - lastTimeRef.current;
+    lastTimeRef.current = time;
+
+    setCircles(prev => {
+      let isGameOver = false;
+      const screenMin = Math.min(window.innerWidth, window.innerHeight);
+      const maxAllowedSize = screenMin * 1.5; // 画面を覆い尽くすサイズ
+
+      const nextCircles = prev.map(c => {
+        // 徐々に拡大し、初期はフェードイン
+        const nextSize = c.size + (growthRateRef.current * (deltaTime / 1000));
+        const nextOpacity = Math.min(1, c.opacity + deltaTime / 500);
+        
+        // 巨大化判定（1つでも巨大化したらゲームオーバー）
+        if (nextSize > maxAllowedSize) {
+          isGameOver = true;
+        }
+        
+        return { ...c, size: nextSize, opacity: nextOpacity };
+      });
+
+      if (isGameOver) {
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+        setMessage('GAME OVER');
+        // 少し待ってから結果画面へ
+        setTimeout(() => {
+          onGameOver({ score: scoreRef.current, clear: false });
+        }, 1500);
+        return prev; // ゲームオーバー時は拡大を止める
+      }
+
+      return nextCircles;
+    });
+
+    // スポーン処理
+    if (time - lastSpawnTimeRef.current > currentSpawnInterval.current) {
+      spawnCircle(time);
+      // 時間経過とともに難易度上昇（スポーン間隔短縮、拡大速度上昇）
+      currentSpawnInterval.current = Math.max(600, currentSpawnInterval.current * 0.98);
+      growthRateRef.current = Math.min(60, growthRateRef.current + 0.1);
+    }
+
+    requestRef.current = requestAnimationFrame(animate);
+  }, [onGameOver, spawnCircle]);
+
+  // 初期化とループ開始
+  useEffect(() => {
+    setMessage('START!');
+    const timer = setTimeout(() => setMessage(''), 1500);
+    
+    // 強制的にinputにフォーカス
+    inputRef.current?.focus();
+    
+    lastTimeRef.current = performance.now();
+    spawnCircle();
+    
+    requestRef.current = requestAnimationFrame(animate);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(requestRef.current);
+    };
+  }, [animate, spawnCircle]);
+
+  // タイマー処理
+  useEffect(() => {
+    if (timeLimit === 0 || !isPlaying) return;
+    
+    const timerId = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerId);
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+          setMessage('TIME UP!');
+          setTimeout(() => {
+            onGameOver({ score: scoreRef.current, clear: true });
+          }, 1500);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timerId);
+  }, [timeLimit, isPlaying, onGameOver]);
+
+  // パーティクルクリーンアップ
+  useEffect(() => {
+    if (particles.length > 0) {
+      const timer = setTimeout(() => {
+        setParticles(prev => prev.filter(p => Date.now() - p.createdAt < 500));
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [particles]);
+
+  // 入力処理 (隠しinput経由)
+  const handleInputChange = (e) => {
+    if (!isPlaying) return;
+    const val = e.target.value;
+    // アルファベットのみ許容
+    const filtered = val.replace(/[^a-zA-Z]/g, '');
+    setInputStr(filtered);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!isPlaying) return;
+    if (e.nativeEvent.isComposing) return; // IME変換中は無視
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!inputStr) return;
+
+      const targetStr = inputStr.toLowerCase();
+      // 一致する元素を探す（複数ある場合は最も古いものを消す）
+      const targetIdx = circles.findIndex(c => c.element.symbol.toLowerCase() === targetStr);
+
+      if (targetIdx !== -1) {
+        // 正解
+        const targetCircle = circles[targetIdx];
+        const newCombo = combo + 1;
+        const points = newCombo * (10 * activeElements.length);
+        
+        setCombo(newCombo);
+        setScore(prev => {
+          const nextScore = prev + points;
+          scoreRef.current = nextScore;
+          return nextScore;
+        });
+        
+        // 弾けるパーティクル追加
+        setParticles(prev => [...prev, {
+          id: Date.now(),
+          x: targetCircle.x,
+          y: targetCircle.y,
+          size: targetCircle.size,
+          color: ELEMENT_CATEGORIES[targetCircle.element.category].color,
+          createdAt: Date.now()
+        }]);
+
+        setCircles(prev => {
+          const next = prev.filter((_, i) => i !== targetIdx);
+          // 画面上から元素がなくなったら即座に補充
+          if (next.length === 0) {
+            setTimeout(() => spawnCircle(performance.now()), 0);
+          }
+          return next;
+        });
+      } else {
+        // 不正解
+        setCombo(0);
+        // ミスエフェクトを入れる場合はここに
+      }
+      
+      setInputStr(''); // 入力をクリア
+    }
+  };
+
+  // 画面クリックでinputにフォーカスを戻す（スマホ対策）
+  const handleContainerClick = () => {
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div className="absolute inset-0 z-10 overflow-hidden" onClick={handleContainerClick}>
+      {/* 隠しInput (IME対策・強制半角英数字入力) */}
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="email"
+        autoCapitalize="none"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck="false"
+        value={inputStr}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => { if(isPlaying) inputRef.current?.focus() }}
+        className="absolute top-0 left-0 opacity-0 w-1 h-1 pointer-events-none"
+      />
+
+      {/* ヘッダーUI */}
+      <div className="absolute top-4 left-6 right-6 flex justify-between items-start pointer-events-none z-30">
+        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 shadow-lg">
+          <div className="text-slate-400 text-sm font-bold tracking-widest">SCORE</div>
+          <div className="text-4xl font-mono text-blue-300 drop-shadow-[0_0_8px_rgba(147,197,253,0.8)]">
+            {score.toLocaleString()}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          {timeLimit > 0 && (
+            <div className={`bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border ${timeLeft <= 10 ? 'border-red-500 text-red-400 animate-pulse' : 'border-white/10 text-slate-200'}`}>
+              <span className="font-mono text-2xl">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          )}
+          {combo > 1 && (
+            <div className="bg-gradient-to-r from-orange-500/80 to-pink-500/80 backdrop-blur-md px-4 py-1 rounded-lg border border-white/30 shadow-[0_0_15px_rgba(249,115,22,0.6)] animate-bounce">
+              <span className="text-white font-bold text-xl">{combo} COMBO!</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 円の描画 */}
+      {circles.map(c => {
+        const cat = ELEMENT_CATEGORIES[c.element.category];
+        return (
+          <div
+            key={c.id}
+            className="absolute rounded-full flex flex-col items-center justify-center border-2 transition-transform ease-linear will-change-transform"
+            style={{
+              left: `${c.x}%`,
+              top: `${c.y}%`,
+              width: `${c.size}px`,
+              height: `${c.size}px`,
+              transform: 'translate(-50%, -50%)',
+              opacity: c.opacity,
+              backgroundColor: `${cat.color}20`,
+              borderColor: `${cat.color}80`,
+              boxShadow: `0 0 15px ${cat.color}40`,
+            }}
+          >
+            <span 
+              className="font-serif font-bold text-white drop-shadow-md whitespace-nowrap"
+              style={{ fontSize: `${Math.max(12, c.size / 4)}px` }}
+            >
+              {c.element.name}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* 正解時のエフェクト */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute rounded-full pointer-events-none will-change-transform"
+          style={{
+            left: `${p.x}%`, top: `${p.y}%`,
+            width: `${p.size}px`, height: `${p.size}px`,
+            border: `4px solid ${p.color}`,
+            animation: 'pop-out 0.4s ease-out forwards',
+          }}
+        />
+      ))}
+
+      {/* 入力UI */}
+      <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none">
+        <div className="bg-slate-900/80 backdrop-blur-xl px-12 py-4 rounded-3xl border border-white/20 shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-col items-center gap-1">
+          <span className="text-slate-400 text-xs tracking-widest uppercase">Input Element Symbol</span>
+          <div className="text-white text-5xl font-mono tracking-[0.2em] h-12 flex items-center min-w-[120px] justify-center text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
+            {inputStr.toUpperCase() || <span className="text-slate-600 animate-pulse">_</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* メッセージオーバーレイ (START, GAME OVER) */}
+      {message && (
+        <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm pointer-events-none">
+          <h2 className="text-6xl md:text-8xl font-black italic tracking-widest text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-500 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
+            {message}
+          </h2>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- 結果画面 ---
+function ResultScreen({ result, onNavigate }) {
+  if (!result) return null;
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen relative z-10">
+      <div className="bg-slate-900/60 backdrop-blur-xl p-12 rounded-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col items-center max-w-lg w-full">
+        <h2 className="text-4xl font-serif text-blue-300 mb-2">
+          {result.clear ? 'TIME UP!' : 'GAME OVER'}
+        </h2>
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent my-6"></div>
+        
+        <p className="text-slate-400 tracking-widest mb-2">FINAL SCORE</p>
+        <p className="text-6xl font-mono text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] mb-10">
+          {result.score.toLocaleString()}
+        </p>
+
+        <div className="flex gap-4 w-full">
+          <button 
+            onClick={() => onNavigate('game')}
+            className="flex-1 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-[0_0_15px_rgba(37,99,235,0.5)]"
+          >
+            もう一度プレイ
+          </button>
+          <button 
+            onClick={() => onNavigate('title')}
+            className="flex-1 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 border border-white/20 font-bold transition-all"
+          >
+            タイトルへ
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- ランキング画面 ---
+function RankingScreen({ scores, onNavigate }) {
+  return (
+    <div className="flex flex-col items-center justify-start min-h-screen p-10 relative z-10">
+      <div className="w-full max-w-2xl bg-slate-900/70 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-4xl font-serif text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 drop-shadow-[0_0_10px_rgba(251,191,36,0.3)]">
+            ハイスコア
+          </h2>
+          <button onClick={() => onNavigate('title')} className="px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 transition-all">
+            戻る
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {scores.length === 0 ? (
+            <p className="text-center text-slate-500 py-10">まだスコアがありません。</p>
+          ) : (
+            scores.map((s, idx) => (
+              <div key={s.id} className="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="flex items-center gap-6">
+                  <span className={`text-2xl font-black w-8 text-center ${
+                    idx === 0 ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' :
+                    idx === 1 ? 'text-slate-300 drop-shadow-[0_0_8px_rgba(203,213,225,0.8)]' :
+                    idx === 2 ? 'text-amber-600 drop-shadow-[0_0_8px_rgba(217,119,6,0.8)]' :
+                    'text-slate-500'
+                  }`}>
+                    {idx + 1}
+                  </span>
+                  <span className="text-3xl font-mono text-white tracking-wider">{s.score.toLocaleString()} <span className="text-sm text-slate-400">点</span></span>
+                </div>
+                <div className="text-right">
+                  <div className="text-blue-300 font-bold">{s.elementsCount} 種類</div>
+                  <div className="text-xs text-slate-500">{s.date}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
